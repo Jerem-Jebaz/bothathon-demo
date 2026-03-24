@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PersonaBot Live Demo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">AI LIVE DEMO</p>
+        <h1>PersonaBot</h1>
+      </div>
+      <button id="resetButton" class="reset-btn" type="button">Reset Chat</button>
+    </header>
+
+    <section class="mode-panel" aria-label="Personality modes">
+      <button class="mode-btn active" data-mode="chill_friend" type="button">Chill Friend</button>
+      <button class="mode-btn" data-mode="strict_professor" type="button">Strict Professor</button>
+      <button class="mode-btn" data-mode="savage_roast" type="button">Savage Roast</button>
+    </section>
+
+    <main id="chatWindow" class="chat-window" aria-live="polite"></main>
+
+    <form id="chatForm" class="chat-form">
+      <input
+        id="messageInput"
+        type="text"
+        placeholder="Ask anything..."
+        autocomplete="off"
+        maxlength="1000"
+        required
+      />
+      <button id="sendButton" type="submit">Send</button>
+    </form>
+  </div>
+
+  <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
