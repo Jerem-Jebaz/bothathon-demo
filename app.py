@@ -11,26 +11,29 @@ load_dotenv()
 MODEL_NAME = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
 
 MODE_CONFIG = {
-    "Chill 😌": {"icon": "😌", "label": "Chill Mode"},
-    "Get Serious 🎯": {"icon": "🎯", "label": "Serious Mode"},
-    "Roast Me 💀": {"icon": "💀", "label": "Roast Mode"},
+    "chill": {"icon": "smiley", "label": "Chill Mode", "display": "Chill"},
+    "serious": {"icon": "target", "label": "Serious Mode", "display": "Get Serious"},
+    "roast": {"icon": "skull", "label": "Roast Mode", "display": "Roast Me"},
 }
 
 PERSONALITY_PROMPTS: Dict[str, str] = {
-    "Chill 😌": (
-        "You are Chill 😌 for first-year students. "
+    "chill": (
+        "You are Chill for college students. "
         "Tone: warm, casual, friendly, low-pressure. "
         "Keep responses short and practical. Use encouragement."
+        "Responses should be 1-4 lines"
     ),
-    "Get Serious 🎯": (
-        "You are Get Serious 🎯 for first-year students. "
+    "serious": (
+        "You are Get Serious for college students. "
         "Tone: direct, structured, no fluff. "
         "Give concise, actionable steps with accountability."
+        "Responses should be 1-2 lines"
     ),
-    "Roast Me 💀": (
-        "You are Roast Me 💀 for first-year students. "
+    "roast": (
+        "You are Roast Me for college students. "
         "Tone: witty, playful roast style, but classroom-safe and non-abusive. "
         "Roast behavior, not identity. End with useful advice. Keep it concise and funny."
+        "Responses should be 1-2 lines"
     ),
 }
 
@@ -45,9 +48,9 @@ def generate_response(user_input: str, system_prompt: str, mode: str) -> str:
     client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
     temperature = {
-        "Chill 😌": 0.75,
-        "Get Serious 🎯": 0.35,
-        "Roast Me 💀": 1.0,
+        "chill": 0.75,
+        "serious": 0.35,
+        "roast": 1.0,
     }[mode]
 
     completion = client.chat.completions.create(
@@ -70,40 +73,50 @@ def init_state() -> None:
     if "last_mode" not in st.session_state:
         st.session_state.last_mode = None
 
-    if "last_input" not in st.session_state:
-        st.session_state.last_input = ""
+    if "chat_history" not in st.session_state:
+        st.session_state.chat_history = []
 
-    if "last_response" not in st.session_state:
-        st.session_state.last_response = ""
+    if "queued_input" not in st.session_state:
+        st.session_state.queued_input = None
 
 
 def main() -> None:
-    st.set_page_config(page_title="PersonaBot", page_icon="🤖", layout="centered")
+    st.set_page_config(page_title="PersonaBot", layout="centered")
     init_state()
 
-    st.title("PersonaBot")
-    st.markdown("### Try different modes and see how the same problem gets totally different responses 👀")
+    st.markdown(
+        '<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">',
+        unsafe_allow_html=True,
+    )
+
+    st.markdown('<h1><i class="ph ph-robot" aria-hidden="true"></i> PersonaBot</h1>', unsafe_allow_html=True)
+    st.markdown(
+        '<p style="margin-top: -0.5rem;">Try different modes and see how the same problem gets totally different responses.</p>',
+        unsafe_allow_html=True,
+    )
 
     mode = st.radio(
         "Personality Mode",
         list(MODE_CONFIG.keys()),
+        format_func=lambda mode_key: MODE_CONFIG[mode_key]["display"],
         horizontal=True,
     )
 
     if st.session_state.last_mode != mode:
         try:
-            st.toast(f"{MODE_CONFIG[mode]['label']} {MODE_CONFIG[mode]['icon']}")
+            st.toast(f"{MODE_CONFIG[mode]['label']} enabled")
         except Exception:
-            st.info(f"Switched to {MODE_CONFIG[mode]['label']} {MODE_CONFIG[mode]['icon']}")
+            st.info(f"Switched to {MODE_CONFIG[mode]['label']}")
 
         st.session_state.last_mode = mode
 
-    st.caption(
+    st.markdown(
         {
-            "Chill 😌": "Calm advice, no stress",
-            "Get Serious 🎯": "Straight to the point",
-            "Roast Me 💀": "No mercy, college style 💀",
-        }[mode]
+            "chill": '<span><i class="ph ph-smiley" aria-hidden="true"></i> Calm advice, no stress</span>',
+            "serious": '<span><i class="ph ph-target" aria-hidden="true"></i> Straight to the point</span>',
+            "roast": '<span><i class="ph ph-skull" aria-hidden="true"></i> No mercy, college style</span>',
+        }[mode],
+        unsafe_allow_html=True,
     )
 
     starter_prompts = [
@@ -118,35 +131,55 @@ def main() -> None:
     for i, prompt in enumerate(starter_prompts):
         with prompt_cols[i % 2]:
             if st.button(prompt, use_container_width=True):
-                st.session_state["last_input"] = prompt
+                st.session_state.queued_input = prompt
                 st.rerun()
 
     if not os.getenv("GROQ_API_KEY"):
         st.error("GROQ_API_KEY is missing in your .env file.")
         st.stop()
 
+    for message in st.session_state.chat_history:
+        with st.chat_message(message["role"]):
+            if message["role"] == "assistant":
+                icon = MODE_CONFIG[message["mode"]]["icon"]
+                display = MODE_CONFIG[message["mode"]]["display"]
+                st.markdown(
+                    f'<span><i class="ph ph-{icon}" aria-hidden="true"></i> {display}</span>',
+                    unsafe_allow_html=True,
+                )
+            st.write(message["text"])
+
     user_input = st.chat_input("Say something...")
+    incoming_text = user_input or st.session_state.queued_input
+    st.session_state.queued_input = None
 
-    if user_input:
-        st.session_state.last_input = user_input
+    if incoming_text:
+        st.session_state.chat_history.append(
+            {"role": "user", "text": incoming_text, "mode": mode}
+        )
 
-    if st.session_state.last_input:
+        with st.chat_message("user"):
+            st.write(incoming_text)
+
         try:
             response = generate_response(
-                st.session_state.last_input,
+                incoming_text,
                 PERSONALITY_PROMPTS[mode],
                 mode,
             )
-            st.session_state.last_response = response
         except Exception:
-            st.session_state.last_response = "The assistant is temporarily unavailable. Please try again."
+            response = "The assistant is temporarily unavailable. Please try again."
 
-        with st.chat_message("user", avatar="🧑‍🎓"):
-            st.write(st.session_state.last_input)
+        st.session_state.chat_history.append(
+            {"role": "assistant", "text": response, "mode": mode}
+        )
 
-        bot_icon = MODE_CONFIG[mode]["icon"]
-        with st.chat_message("assistant", avatar=bot_icon):
-            st.write_stream(stream_text(st.session_state.last_response))
+        with st.chat_message("assistant"):
+            st.markdown(
+                f'<span><i class="ph ph-{MODE_CONFIG[mode]["icon"]}" aria-hidden="true"></i> {MODE_CONFIG[mode]["display"]}</span>',
+                unsafe_allow_html=True,
+            )
+            st.write_stream(stream_text(response))
 
 
 if __name__ == "__main__":
